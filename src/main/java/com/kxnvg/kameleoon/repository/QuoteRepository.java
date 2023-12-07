@@ -14,4 +14,6 @@ public interface QuoteRepository extends JpaRepository<Quote, Long> {
     @Query("select q from Quote q order by q.votes desc")
     List<Quote> getTopTenQuotes();
 
+    @Query("select q from Quote q order by rand() limit 1")
+    Quote getRandomQuote();
 }

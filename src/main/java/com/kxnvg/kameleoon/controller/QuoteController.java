@@ -1,6 +1,7 @@
 package com.kxnvg.kameleoon.controller;
 
 import com.kxnvg.kameleoon.dto.QuoteDto;
+import com.kxnvg.kameleoon.dto.VoteDto;
 import com.kxnvg.kameleoon.service.QuoteService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -54,16 +55,16 @@ public class QuoteController {
         return quoteService.deleteQuote(quoteId);
     }
 
-    @PutMapping("/{id}/upvote")
-    public void upvote(@PathVariable("id") Long quoteId) {
-        log.info("Received request to upvote quote with id={}", quoteId);
-        quoteService.upvote(quoteId);
+    @PostMapping("/upvote")
+    public void upvote(@RequestBody @Valid VoteDto voteDto) {
+        log.info("Received request to upvote quote with id={}", voteDto.getQuoteId());
+        quoteService.upvote(voteDto);
     }
 
-    @PutMapping("/{id}/downvote")
-    public void downvote(@PathVariable("id") Long quoteId) {
-        log.info("Received request to downvote quote with id={}", quoteId);
-        quoteService.downvote(quoteId);
+    @PostMapping("/downvote")
+    public void downvote(@RequestBody @Valid VoteDto voteDto) {
+        log.info("Received request to downvote quote with id={}", voteDto.getQuoteId());
+        quoteService.downvote(voteDto);
     }
 
     @GetMapping("/top")
@@ -76,5 +77,11 @@ public class QuoteController {
     public List<QuoteDto> getWorseTenQuotes() {
         log.info("Received request to get worse 10 quotes");
         return quoteService.getWorseTenQuotes();
+    }
+
+    @GetMapping("/{id}/graph-evolution")
+    public List<VoteDto> getGraphEvolution(@PathVariable("id") Long quoteId) {
+        log.info("Received request to get graph evolution of quote with id={}", quoteId);
+        return quoteService.getGraphEvolution(quoteId);
     }
 }

@@ -1,18 +1,23 @@
 package com.kxnvg.kameleoon.service;
 
 import com.kxnvg.kameleoon.dto.QuoteDto;
+import com.kxnvg.kameleoon.dto.VoteDto;
 import com.kxnvg.kameleoon.entity.Quote;
 import com.kxnvg.kameleoon.mapper.QuoteMapper;
+import com.kxnvg.kameleoon.mapper.VoteMapper;
 import com.kxnvg.kameleoon.repository.QuoteRepository;
+import com.kxnvg.kameleoon.repository.VoteRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
@@ -20,7 +25,9 @@ import java.util.Random;
 public class QuoteService {
 
     private final QuoteRepository quoteRepository;
+    private final VoteRepository voteRepository;
     private final QuoteMapper quoteMapper;
+    private final VoteMapper voteMapper;
 
     @Transactional(readOnly = true)
     public QuoteDto getQuote(Long quoteId) {
@@ -31,12 +38,14 @@ public class QuoteService {
 
     @Transactional(readOnly = true)
     public QuoteDto getRandomQuote() {
-        long quoteNumber = quoteRepository.count();
-        long quoteId = new Random().nextLong(quoteNumber);
+        Quote randomQuote = quoteRepository.getRandomQuote();
 
-        Quote quote = quoteRepository.findById(quoteId).get();
-        log.info("Quote with id={} was taken from DB successfully", quoteId);
-        return quoteMapper.toDto(quote);
+        if (!(randomQuote == null)) {
+            log.info("Quote with id={} was taken from DB successfully", randomQuote.getId());
+            return quoteMapper.toDto(randomQuote);
+        } else {
+            throw new EntityNotFoundException("There aren't any quotes");
+        }
     }
 
     @Transactional
@@ -68,19 +77,26 @@ public class QuoteService {
     }
 
     @Transactional
-    public void upvote(Long quoteId) {
-        Quote quote = takeQuoteFromDB(quoteId);
+    @Retryable(retryFor = OptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 300))
+    public void upvote(VoteDto voteDto) {
+        Quote quote = takeQuoteFromDB(voteDto.getQuoteId());
+
         quote.increment();
-        log.info("Votes of quote with id={} was increment", quoteId);
+        voteDto.setVoteFlag(true);
+        voteRepository.save(voteMapper.toEntity(voteDto));
+        log.info("Votes of quote with id={} was increment", quote.getId());
     }
 
     @Transactional
-    public void downvote(Long quoteId) {
-        Quote quote = takeQuoteFromDB(quoteId);
-        quote.decrement();
-        log.info("Votes of quote with id={} was decrement", quoteId);
-    }
+    @Retryable(retryFor = OptimisticLockingFailureException.class, maxAttempts = 5, backoff = @Backoff(delay = 300))
+    public void downvote(VoteDto voteDto) {
+        Quote quote = takeQuoteFromDB(voteDto.getQuoteId());
 
+        quote.decrement();
+        voteDto.setVoteFlag(false);
+        voteRepository.save(voteMapper.toEntity(voteDto));
+        log.info("Votes of quote with id={} was decrement", quote.getId());
+    }
 
     @Transactional(readOnly = true)
     public List<QuoteDto> getTopTenQuotes() {
@@ -95,8 +111,16 @@ public class QuoteService {
     public List<QuoteDto> getWorseTenQuotes() {
         List<Quote> topQuotes = quoteRepository.getWorseTenQuotes();
         log.info("Worse quotes was taken from DB successfully");
-        return topQuotes.stream().
-                map(quoteMapper::toDto)
+        return topQuotes.stream()
+                .map(quoteMapper::toDto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<VoteDto> getGraphEvolution(Long quoteId) {
+        return voteRepository.findAllQuoteVotes(quoteId)
+                .stream()
+                .map(voteMapper::toDto)
                 .toList();
     }
 

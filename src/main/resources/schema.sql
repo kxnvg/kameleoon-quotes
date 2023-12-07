@@ -15,5 +15,21 @@ CREATE TABLE quotes
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     user_id BIGINT NOT NULL,
     votes BIGINT,
+    version BIGINT NOT NULL,
+
     FOREIGN KEY(user_id) REFERENCES users(id)
-)
+);
+
+CREATE TABLE votes
+(
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    vote_flag BOOLEAN,
+    user_id BIGINT NOT NULL,
+    quote_id BIGINT NOT NULL,
+    voted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(quote_id) REFERENCES quotes(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX user_quote_index ON votes(user_id, quote_id);
